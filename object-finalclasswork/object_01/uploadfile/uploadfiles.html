@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>檔案上傳與資料庫操作</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <p align="center"><img src="title.jpg" alt="Title Image"></p>
+
+    <?php
+    class FileUploader
+    {
+        private $uploadDir;
+
+        public function __construct($uploadDir)
+        {
+            $this->uploadDir = rtrim($uploadDir, '/') . '/';
+        }
+
+        public function uploadFiles()
+        {
+            for ($i = 0; $i <= 3; $i++) {
+                if (isset($_FILES["myfile"]["name"][$i]) && $_FILES["myfile"]["name"][$i] != "") {
+                    $this->moveFile($i);
+                }
+            }
+        }
+
+        private function moveFile($index)
+        {
+            $fileName = $_FILES["myfile"]["name"][$index];
+            $fileTmpName = $_FILES["myfile"]["tmp_name"][$index];
+            $uploadFile = $this->uploadDir . $this->sanitizeFileName($fileName);
+
+            if (move_uploaded_file($fileTmpName, $uploadFile)) {
+                $this->displayFileInfo($fileName, $fileTmpName, $_FILES["myfile"]["size"][$index], $_FILES["myfile"]["type"][$index]);
+            } else {
+                echo "檔案上傳失敗: $fileName<br>";
+            }
+        }
+
+        private function sanitizeFileName($fileName)
+        {
+            return preg_replace('/[^a-zA-Z0-9_\.-]/', '_', $fileName);
+        }
+
+        private function displayFileInfo($fileName, $tmpName, $fileSize, $fileType)
+        {
+            echo "檔案名稱：" . htmlspecialchars($fileName) . "<br>";
+            echo "暫存檔名：" . htmlspecialchars($tmpName) . "<br>";
+            echo "檔案大小：" . htmlspecialchars($fileSize) . " Bytes<br>";
+            echo "檔案類型：" . htmlspecialchars($fileType) . "<br>";
+            echo "<hr>";
+        }
+    }
+
+    class Database
+    {
+        private $pdo;
+
+        public function __construct($host, $dbname, $user, $pass)
+        {
+            $dsn = "mysql:host=$host;dbname=$dbname;charset=utf8";
+            try {
+                $this->pdo = new PDO($dsn, $user, $pass);
+                $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } catch (PDOException $e) {
+                die("資料庫連接失敗: " . $e->getMessage());
+            }
+        }
+
+        public function insertFileInfo($fileName, $fileSize, $fileType)
+        {
+            $sql = "INSERT INTO files (name, size, type) VALUES (:name, :size, :type)";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                ':name' => $fileName,
+                ':size' => $fileSize,
+                ':type' => $fileType,
+            ]);
+        }
+    }
+
+    // 使用 FileUploader 類別
+    $uploadDir = "./upload files";
+    $uploader = new FileUploader($uploadDir);
+    $uploader->uploadFiles();
+
+    // 使用 Database 類別
+    $host = "localhost";
+    $dbname = "test_db";
+    $user = "root";
+    $pass = "";
+    $db = new Database($host, $dbname, $user, $pass);
+
+    // 儲存檔案資訊到資料庫
+    for ($i = 0; $i <= 3; $i++) {
+        if (isset($_FILES["myfile"]["name"][$i]) && $_FILES["myfile"]["name"][$i] != "") {
+            $db->insertFileInfo(
+                $_FILES["myfile"]["name"][$i],
+                $_FILES["myfile"]["size"][$i],
+                $_FILES["myfile"]["type"][$i]
+            );
+        }
+    }
+    ?>
+</body>
+</html>
